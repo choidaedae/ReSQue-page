@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#000000" />
+  <title>ReSQue: Representative Surrogate Query for Streaming Video KV Cache Compression</title>
+  <meta name="description" content="ReSQue learns reusable head-level query vectors that match the question-averaged attention, and compresses the KV cache of streaming video MLLMs without an extra forward pass." />
+  <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: { primary: '#2563eb', secondary: '#475569' },
+          fontFamily: {
+            sans: ['Noto Sans', 'system-ui', 'sans-serif'],
+            'google-sans': ['Google Sans', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.cdnfonts.com/css/google-sans" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    body { font-family: 'Noto Sans', sans-serif; }
+    .tab-btn[aria-selected="true"] { background: #0f172a; color: #fff; }
+    .num-best { font-weight: 700; color: #0f172a; }
+    .num-second { text-decoration: underline; text-underline-offset: 3px; }
+  </style>
+</head>
+
+<body class="min-h-screen bg-white text-slate-900 selection:bg-blue-100 selection:text-blue-900 font-light">
+
+  <!-- ================= Header ================= -->
+  <header class="pt-16 pb-8 md:pt-24 md:pb-12 text-center px-4 max-w-5xl mx-auto">
+    <h1 class="text-3xl md:text-4xl lg:text-5xl font-semibold tracking-tight text-slate-900 mb-6 font-google-sans">
+      ReSQue: Representative Surrogate Query<br class="hidden md:block" /> for Streaming Video KV Cache Compression
+    </h1>
+
+    <div class="text-lg mb-8 text-slate-600 font-normal">Anonymous</div>
+
+    <div class="flex flex-wrap justify-center gap-4 mb-4">
+      <a href="#" class="soon inline-flex items-center px-4 py-2 rounded-full font-normal bg-slate-900 text-white opacity-60 cursor-not-allowed" title="Coming soon">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>Paper</a>
+      <a href="#" class="soon inline-flex items-center px-4 py-2 rounded-full font-normal bg-gray-100 text-gray-900 opacity-60 cursor-not-allowed" title="Coming soon">arXiv</a>
+      <a href="#" class="soon inline-flex items-center px-4 py-2 rounded-full font-normal bg-gray-100 text-gray-900 opacity-60 cursor-not-allowed" title="Coming soon">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5"/></svg>Code</a>
+      <button id="copy-bib-top" class="inline-flex items-center px-4 py-2 rounded-full font-normal bg-gray-100 text-gray-900 hover:bg-gray-200 transition-colors">BibTeX</button>
+    </div>
+    <p class="text-sm text-slate-500 mb-4">Links will be added when the paper is released.</p>
+  </header>
+
+  <main class="container mx-auto px-4 pb-20 space-y-16">
+
+    <!-- ================= Teaser + TL;DR ================= -->
+    <div class="space-y-4">
+      <div class="max-w-5xl mx-auto">
+        <img src="./figures/teaser.png" alt="Overview of ReSQue" class="w-full h-auto" />
+      </div>
+      <p class="mx-auto max-w-5xl text-center text-slate-600 text-sm md:text-base leading-snug px-4 md:px-12">
+        <strong class="font-semibold text-slate-700">(a)</strong> ReSQue fits a few queries per attention head so that their attention matches the question-averaged attention on calibration videos.
+        <strong class="font-semibold text-slate-700">(b)</strong> During the stream, the fitted query is reused at every compression round and scores the cache without a forward pass.
+        <strong class="font-semibold text-slate-700">(c)</strong> MLVU accuracy at 6K against throughput (frames per second), averaged over three backbones.
+      </p>
+      <section class="py-2 mx-auto max-w-5xl text-center">
+        <p class="text-slate-800 leading-relaxed text-lg font-light">
+          <span class="font-bold">TL;DR:</span> We present <span class="font-medium italic">ReSQue (Representative Surrogate Query)</span>, which learns a few reusable query vectors per attention head
+          by matching the attention that future questions pay to the video. A single matrix product with these fixed queries scores the streaming KV cache
+          &mdash; <span class="font-medium">no extra forward pass</span> &mdash; so it is more accurate than prior compressors at nearly the speed of a sliding window.
+        </p>
+      </section>
+    </div>
+
+    <!-- ================= Abstract ================= -->
+    <section class="bg-slate-50 py-12 px-4 rounded-3xl mx-auto max-w-4xl shadow-sm border border-slate-100">
+      <h2 class="text-2xl font-bold text-center mb-6 text-slate-800 font-google-sans">Abstract</h2>
+      <p class="text-slate-700 leading-relaxed text-lg text-justify px-2 md:px-8">
+        Streaming video understanding requires multimodal large language models (MLLMs) to compress growing KV caches before future questions are known, risking the loss of relevant information.
+        We introduce <strong>ReSQue</strong> (<strong>Representative Surrogate Query</strong>), which directly learns reusable queries to preserve information needed by future questions.
+        We define <em>oracle attention</em> as the attention averaged over possible future questions, whose highest-scoring tokens maximize expected attention retention for a fixed cache.
+        Since this oracle is unavailable, ReSQue constructs <em>target attention</em> by averaging question attention for each calibration video and directly optimizes head-level query vectors to match its distribution.
+        Once learned, these queries are reused across videos and compression rounds, scoring cached keys without additional model or scorer-network forward passes.
+        We evaluate ReSQue on three MLLM backbones and four video QA benchmarks. ReSQue achieves the best or tied-best accuracy in 25 of 27 long-video settings.
+        Further analyses demonstrate closer alignment with future-question attention and efficient streaming compression with low recurring computational overhead.
+      </p>
+    </section>
+
+    <!-- ================= Overview ================= -->
+    <section class="max-w-5xl mx-auto">
+      <h2 class="text-3xl font-bold mb-8 text-slate-900 font-google-sans text-center">Overview</h2>
+      <p class="text-lg text-slate-700 mb-8 leading-relaxed font-light">
+        In streaming video, the KV cache must be compressed <em>before</em> any question arrives. If the future questions were known, we would keep the visual tokens that they attend to most.
+        ReSQue approximates this ideal with a small set of <strong class="font-medium">learned, fixed query vectors per attention head</strong>: they are fitted once per model and then reused for every video and every compression round.
+      </p>
+
+      <div class="grid md:grid-cols-3 gap-8 mt-8">
+        <div>
+          <strong class="text-slate-900 block mb-2 font-google-sans">1. Oracle attention</strong>
+          <p class="text-slate-600 font-light">
+            Averaging the attention of all future questions over the cached visual tokens gives the <em>oracle attention</em>.
+            Keeping its highest-scoring tokens maximizes the expected attention retained by a fixed-size cache.
+          </p>
+        </div>
+        <div>
+          <strong class="text-slate-900 block mb-2 font-google-sans">2. Fit queries to the target attention</strong>
+          <p class="text-slate-600 font-light">
+            The oracle is unknown, so we build a <em>target attention</em> per calibration video by averaging the attention of its questions, and optimize
+            <span class="font-medium">S = 8</span> query vectors per head to match that distribution with a KL divergence. The fit takes under two hours on one GPU.
+          </p>
+        </div>
+        <div>
+          <strong class="text-slate-900 block mb-2 font-google-sans">3. Reuse during streaming</strong>
+          <p class="text-slate-600 font-light">
+            At every round the fixed queries score the cached keys with one batched matrix product &mdash; no model or scorer-network forward pass &mdash;
+            and each KV head keeps its top-<em>B</em> tokens.
+          </p>
+        </div>
+      </div>
+
+      <div class="mt-10 mx-auto max-w-3xl rounded-xl border border-slate-200 bg-slate-50 px-6 py-5 text-center text-slate-800">
+        <div class="text-sm text-slate-500 mb-1">Attention induced by the learned queries in one head</div>
+        <div class="text-lg font-serif italic">
+          a<sub>&theta;</sub> = (1/S) &Sigma;<sub>s=1..S</sub> softmax( q<sup>(s)</sup> R<sub>p</sub> K<sup>&#8868;</sup> / &radic;d ),
+          &nbsp; &theta;* = argmin KL( &acirc;<sub>V</sub> &Vert; a<sub>&theta;</sub> )
+        </div>
+        <div class="text-sm text-slate-500 mt-1">q<sup>(s)</sup>: learned query vectors &middot; R<sub>p</sub>: rotary matrix at the position a question would take &middot; K: cached keys &middot; &acirc;<sub>V</sub>: target attention</div>
+      </div>
+    </section>
+
+    <hr class="border-slate-100 max-w-xl mx-auto" />
+
+    <!-- ================= Key results ================= -->
+    <section class="max-w-5xl mx-auto">
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 text-center">
+        <div class="rounded-2xl border border-slate-100 shadow-sm p-5"><div class="text-4xl font-bold text-primary font-google-sans">25 / 27</div><div class="text-slate-600 mt-1 text-sm">long-video settings with the best or tied-best accuracy</div></div>
+        <div class="rounded-2xl border border-slate-100 shadow-sm p-5"><div class="text-4xl font-bold text-primary font-google-sans">58&ndash;65</div><div class="text-slate-600 mt-1 text-sm">frames per second, about 96% of a sliding window (SWA)</div></div>
+        <div class="rounded-2xl border border-slate-100 shadow-sm p-5"><div class="text-4xl font-bold text-primary font-google-sans">0.11 s</div><div class="text-slate-600 mt-1 text-sm">to the first token at every stream length (Full KV: 1.0&ndash;12.8 s)</div></div>
+        <div class="rounded-2xl border border-slate-100 shadow-sm p-5"><div class="text-4xl font-bold text-primary font-google-sans">&lt; 2 h</div><div class="text-slate-600 mt-1 text-sm">to fit the queries once per model on one GPU</div></div>
+      </div>
+    </section>
+
+    <!-- ================= Quantitative results ================= -->
+    <section class="max-w-5xl mx-auto scroll-mt-24" id="results">
+      <div class="text-center mb-8">
+        <h2 class="text-3xl font-bold mb-6 text-slate-900 font-google-sans">Quantitative Results</h2>
+        <p class="text-lg text-slate-700 max-w-5xl mx-auto">
+          Under the same budget of about 6K, 3K and 1K visual tokens per head, ReSQue achieves the best or tied-best accuracy in 25 of the 27 long-video settings of three backbones, three benchmarks and three budgets.
+          Its overall accuracy leads the strongest baseline, TriAttention, by <span class="font-bold text-slate-900">0.4 to 3.0 points</span>, and at 6K it matches the uncompressed model on Qwen2.5-VL.
+        </p>
+      </div>
+
+      <div class="grid lg:grid-cols-3 gap-6 mb-10" id="line-charts"></div>
+
+      <div class="flex flex-wrap justify-center gap-2 mb-4" role="tablist" id="backbone-tabs"></div>
+
+      <div class="bg-white p-1 rounded-2xl shadow-lg border border-slate-100 overflow-hidden mb-3">
+        <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+          <table class="w-full text-sm text-left text-slate-600" id="main-table"></table>
+        </div>
+      </div>
+      <p class="text-sm text-slate-500 text-center mb-12">
+        Accuracy (%) at 6K / 3K / 1K visual tokens per head. MLVU: average over task groups; Video-MME: medium and long videos; LongVideoBench: average over the four video-length groups; Overall: mean of the three.
+        <span class="font-semibold text-slate-700">Bold</span>: best, <span class="underline underline-offset-2">underline</span>: second best (Full KV excluded).
+      </p>
+
+      <!-- Efficiency -->
+      <div class="text-center mb-6">
+        <h3 class="text-2xl font-bold mb-3 text-slate-900 font-google-sans">Efficiency</h3>
+        <p class="text-lg text-slate-700 max-w-4xl mx-auto">
+          Because the queries are fixed, scoring needs no forward pass: a compression round of ReSQue is close to that of SWA, which scores nothing,
+          while it is 1.1&ndash;5.9&times; faster than the other compressors on Qwen2.5-VL.
+        </p>
+      </div>
+      <div class="rounded-2xl shadow border border-slate-100 p-4 mb-6">
+        <div class="text-center text-sm text-slate-500 mb-2">Frames processed per second at 6K (6-frame rounds) &mdash; <span id="fps-backbone"></span></div>
+        <div style="height:340px"><canvas id="fps-chart"></canvas></div>
+        <div class="text-center text-xs text-slate-400 mt-2">Every method is timed with 6-frame chunks (HERMES keeps its 16-frame chunks for accuracy but is timed with 6 frames here). Hover a bar for the round latency.</div>
+      </div>
+      <figure class="my-8 w-full">
+        <img src="./figures/efficiency.png" alt="Cost of streaming compression" class="w-full h-auto" />
+        <figcaption class="mt-4 text-center text-slate-600 text-sm md:text-base leading-snug px-4 md:px-12">
+          <strong class="font-semibold text-slate-700">Cost of streaming compression</strong> on Qwen2.5-VL (Video-MME videos of at least 45 minutes, one RTX PRO 6000).
+          (a) Latency of one compression round on a 6-frame chunk at 6K. (b) Peak GPU memory and (c) time from the question to the first token, as the stream grows.
+          Full KV prefills the whole stream after the question.
+        </figcaption>
+      </figure>
+
+      <!-- VStream-QA -->
+      <div class="text-center mb-4 mt-12">
+        <h3 class="text-2xl font-bold mb-3 text-slate-900 font-google-sans">Streaming Benchmark: VStream-QA</h3>
+        <p class="text-lg text-slate-700 max-w-4xl mx-auto">
+          When questions arrive while the stream is playing, ReSQue is the most accurate over all questions on Qwen2.5-VL and LLaVA-OV, and ties TriAttention on Qwen3-VL.
+        </p>
+      </div>
+      <div class="bg-white p-1 rounded-2xl shadow-lg border border-slate-100 overflow-hidden mb-3">
+        <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white"><table class="w-full text-sm text-left text-slate-600" id="stream-table"></table></div>
+      </div>
+      <p class="text-sm text-slate-500 text-center">Accuracy (%) at about 6K tokens per head on the ego-centric (Ego) and movie (Mov.) splits and on all questions; open-ended answers are judged by an LLM (gpt-5-mini).</p>
+    </section>
+
+    <hr class="border-slate-100 max-w-xl mx-auto" />
+
+    <!-- ================= Qualitative ================= -->
+    <section class="max-w-5xl mx-auto">
+      <div class="text-center mb-10">
+        <h2 class="text-3xl font-bold mb-6 text-slate-900 font-google-sans">Qualitative Examples</h2>
+        <p class="text-lg text-slate-700 max-w-5xl mx-auto">
+          We draw the patches that each query keeps in one head when the question arrives. ReSQue keeps more of the <span class="text-blue-600 bg-blue-50 px-1 rounded font-bold">evidence frames</span> (blue) that the question actually reads.
+        </p>
+      </div>
+
+      <figure class="my-8 w-full">
+        <img src="./figures/qualitative.png" alt="Qualitative example, MLVU Qwen3-VL" class="w-full h-auto rounded-xl border border-slate-100" />
+        <figcaption class="mt-4 text-center text-slate-600 text-sm md:text-base leading-snug px-4 md:px-12">
+          MLVU, Qwen3-VL, 6K tokens per head (layer 26, KV head 6). The blue frames lie in the evidence clip (3:55&ndash;4:05), which receives 46% of the question's attention on the uncompressed cache but spans only 2.5% of the frames.
+          ReSQue keeps the most of the evidence frames and is the only method to answer correctly.
+        </figcaption>
+      </figure>
+
+      <div class="grid gap-10 mt-10">
+        <figure class="w-full">
+          <img src="./figures/qual_llavaov.png" alt="Qualitative example, MLVU LLaVA-OV" class="w-full h-auto rounded-xl border border-slate-100" loading="lazy" />
+          <figcaption class="mt-3 text-center text-slate-600 text-sm leading-snug px-4 md:px-12">MLVU, LLaVA-OV, 6K tokens per head (layer 16, KV head 0). The evidence clip (7:45&ndash;8:07) receives 51% of the question's attention but spans 5.0% of the frames. ReSQue keeps 30% of the patches of the evidence frames, against 10% and 8%; all three methods answer correctly.</figcaption>
+        </figure>
+        <figure class="w-full">
+          <img src="./figures/qual_lvb_qwen3vl.png" alt="Qualitative example, LongVideoBench Qwen3-VL" class="w-full h-auto rounded-xl border border-slate-100" loading="lazy" />
+          <figcaption class="mt-3 text-center text-slate-600 text-sm leading-snug px-4 md:px-12">LongVideoBench, Qwen3-VL, 6K tokens per head (layer 23, KV head 2). The moment the question refers to (about 15:40) receives 14% of the attention but spans 0.5% of the frames. ReSQue keeps 32% of its patches, against 10% for InfiniPot-V and 19% for TriAttention; InfiniPot-V and ReSQue answer correctly, TriAttention does not.</figcaption>
+        </figure>
+        <figure class="w-full">
+          <img src="./figures/qual_lvb_qwen25vl.png" alt="Qualitative example, LongVideoBench Qwen2.5-VL" class="w-full h-auto rounded-xl border border-slate-100" loading="lazy" />
+          <figcaption class="mt-3 text-center text-slate-600 text-sm leading-snug px-4 md:px-12">LongVideoBench, Qwen2.5-VL, 6K tokens per head (layer 14, KV head 0). The blue frame is the moment the question refers to (about 0:20). ReSQue keeps 76% of its patches in this head, against 4% and 41%, and is the only method to answer correctly.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <hr class="border-slate-100 max-w-xl mx-auto" />
+
+    <!-- ================= Analysis ================= -->
+    <section class="max-w-5xl mx-auto">
+      <div class="text-center mb-10">
+        <h2 class="text-3xl font-bold mb-6 text-slate-900 font-google-sans">Analysis</h2>
+        <p class="text-lg text-slate-700 max-w-5xl mx-auto">Why can a single fitted query stand in for questions it has never seen?</p>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-8">
+        <div>
+          <strong class="text-slate-900 block mb-2 font-google-sans">Closer to the questions</strong>
+          <p class="text-slate-600 font-light">The attention induced by ReSQue is the closest to the question-averaged attention (lowest KL) on every backbone, and it is the most accurate of the deployable queries. Across queries, a lower KL goes with a higher accuracy (Spearman 0.94 on the Qwen models).</p>
+        </div>
+        <div>
+          <strong class="text-slate-900 block mb-2 font-google-sans">Reuse instead of recompute</strong>
+          <p class="text-slate-600 font-light">Recomputing the query of a text prompt at every round brings no consistent gain over computing it once (&minus;1.6 to +1.2 points). A learned soft token or scorer network adds overhead: ReSQue is 1.3&ndash;1.4&times; and 2.1&ndash;5.2&times; faster and 0.5&ndash;1.5 / 0.2&ndash;2.3 points more accurate.</p>
+        </div>
+        <div>
+          <strong class="text-slate-900 block mb-2 font-google-sans">Fitting beats averaging</strong>
+          <p class="text-slate-600 font-light">TriAttention and Expected Attention estimate importance from query statistics. Fitting the queries to the attention itself yields substantially closer alignment, even when the same calibration questions are used.</p>
+        </div>
+      </div>
+
+      <figure class="my-12 w-full">
+        <img src="./figures/surrogate_queries.png" alt="Surrogate queries: closeness to the questions and accuracy" class="w-full h-auto" />
+        <figcaption class="mt-4 text-center text-slate-600 text-sm md:text-base leading-snug px-4 md:px-12">
+          <strong class="font-semibold text-slate-700">Surrogate queries: closeness to the questions and accuracy.</strong> Forward KL to the question-averaged attention (x, reversed) against MLVU accuracy at 6K (y). Dashed: the real question, unknown to the compressor. Right of the dotted line: oracles that use each video's own questions.
+        </figcaption>
+      </figure>
+      <figure class="my-12 w-full max-w-3xl mx-auto">
+        <img src="./figures/parameterization.png" alt="Parameterization of the surrogate attention map" class="w-full h-auto" />
+        <figcaption class="mt-4 text-center text-slate-600 text-sm md:text-base leading-snug px-4 md:px-12">
+          <strong class="font-semibold text-slate-700">Parameterization of the surrogate attention map.</strong> MLVU accuracy at 6K against throughput. All three are fitted with the same target and objective: directly learned queries (ReSQue), a soft token, and a neural scorer.
+        </figcaption>
+      </figure>
+    </section>
+
+    <!-- ================= BibTeX ================= -->
+    <section class="bg-slate-900 text-slate-300 py-12 px-4 rounded-xl max-w-4xl mx-auto my-16 relative">
+      <div class="flex justify-between items-center mb-4 px-2">
+        <h2 class="text-xl font-bold text-white font-google-sans">BibTeX</h2>
+        <button id="copy-bib" class="text-xs uppercase tracking-wider font-semibold hover:text-white transition-colors">Copy</button>
+      </div>
+      <pre id="bibtex" class="overflow-x-auto p-4 bg-slate-950 rounded-lg text-sm font-mono leading-relaxed border border-slate-800">@misc{resque,
+  title  = {ReSQue: Representative Surrogate Query for Streaming Video KV Cache Compression},
+  author = {Anonymous}
+}</pre>
+    </section>
+  </main>
+
+  <script src="./data.js"></script>
+  <script>
+    const D = window.RESQUE_DATA;
+    const MODELS = ['Qwen2.5-VL-7B', 'Qwen3-VL-8B', 'LLaVA-OV-7B'];
+    const BENCH = ['MLVU', 'Video-MME', 'LongVideoBench', 'Overall'];
+    const BUDGETS = ['6K', '3K', '1K'];
+    const OURS = 'ReSQue (Ours)';
+    let current = MODELS[0];
+    if (location.search.includes('static')) Chart.defaults.animation = false;   // ?static: no chart animation (for screenshots)
+
+    // ---------- helpers
+    const r1 = (x) => Math.round(x * 10) / 10;
+    function marks(rows, bi, k) {                       // best / second best of column (benchmark bi, budget k), Full KV excluded
+      const v = [...new Set(rows.filter(r => r.method !== 'Full KV').map(r => r1(r.vals[bi][k])))].sort((a, b) => b - a);
+      return { best: v[0], second: v[1] };
+    }
+    function cls(x, m) { return r1(x) === m.best ? 'num-best' : (r1(x) === m.second ? 'num-second' : ''); }
+
+    // ---------- main table
+    function renderMain() {
+      const rows = D.main[current];
+      const M = BENCH.map((_, bi) => BUDGETS.map((_, k) => marks(rows, bi, k)));
+      let h = '<thead class="text-xs text-slate-700 uppercase bg-slate-50 border-b border-slate-200"><tr>' +
+        '<th class="px-4 py-3 font-bold border-r border-slate-200 font-google-sans" rowspan="2">Method</th>' +
+        BENCH.map(b => `<th colspan="3" class="px-3 py-3 text-center font-bold border-r border-slate-200 font-google-sans">${b}</th>`).join('') +
+        '</tr><tr class="border-b border-slate-200">' +
+        BENCH.map(() => BUDGETS.map(b => `<th class="py-2 px-2 text-center font-light text-slate-600">${b}</th>`).join('')).join('') +
+        '</tr></thead><tbody>';
+      rows.forEach(r => {
+        const ours = r.method === OURS, full = r.method === 'Full KV';
+        h += `<tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors ${ours ? 'bg-blue-50/40 font-medium' : ''} ${full ? 'text-slate-500' : ''}">` +
+          `<td class="px-4 py-3 whitespace-nowrap border-r border-slate-200 ${ours ? 'text-blue-700 font-semibold' : 'text-slate-900 font-medium'}">${r.method}</td>`;
+        BENCH.forEach((_, bi) => {
+          if (full) { h += `<td colspan="3" class="px-2 py-3 text-center border-r border-slate-100">${r.vals[bi][0].toFixed(1)}</td>`; return; }
+          BUDGETS.forEach((_, k) => {
+            h += `<td class="px-2 py-3 text-center ${k === 2 ? 'border-r border-slate-100' : ''} ${cls(r.vals[bi][k], M[bi][k])}">${r.vals[bi][k].toFixed(1)}</td>`;
+          });
+        });
+        h += '</tr>';
+      });
+      document.getElementById('main-table').innerHTML = h + '</tbody>';
+    }
+
+    // ---------- VStream-QA table
+    function renderStream() {
+      const rows = D.stream.rows;
+      const cols = D.stream.models.length * 3;
+      const best = [], second = [];
+      for (let c = 0; c < cols; c++) {
+        const v = [...new Set(rows.map(r => r1(r.vals[c])))].sort((a, b) => b - a);
+        best.push(v[0]); second.push(v[1]);
+      }
+      let h = '<thead class="text-xs text-slate-700 uppercase bg-slate-50 border-b border-slate-200"><tr><th class="px-4 py-3 font-bold border-r border-slate-200 font-google-sans" rowspan="2">Method</th>' +
+        D.stream.models.map(m => `<th colspan="3" class="px-3 py-3 text-center font-bold border-r border-slate-200 font-google-sans">${m}</th>`).join('') +
+        '</tr><tr class="border-b border-slate-200">' + D.stream.models.map(() => ['Ego', 'Mov.', 'All'].map(x => `<th class="py-2 px-2 text-center font-light text-slate-600">${x}</th>`).join('')).join('') + '</tr></thead><tbody>';
+      rows.forEach(r => {
+        const ours = r.method === OURS;
+        h += `<tr class="border-b border-slate-100 hover:bg-slate-50 ${ours ? 'bg-blue-50/40 font-medium' : ''}"><td class="px-4 py-3 whitespace-nowrap border-r border-slate-200 ${ours ? 'text-blue-700 font-semibold' : 'text-slate-900 font-medium'}">${r.method}</td>`;
+        r.vals.forEach((x, c) => {
+          const k = r1(x) === best[c] ? 'num-best' : (r1(x) === second[c] ? 'num-second' : '');
+          h += `<td class="px-2 py-3 text-center ${c % 3 === 2 ? 'border-r border-slate-100' : ''} ${k}">${x.toFixed(1)}</td>`;
+        });
+        h += '</tr>';
+      });
+      document.getElementById('stream-table').innerHTML = h + '</tbody>';
+    }
+
+    // ---------- accuracy-vs-budget line charts (overall accuracy), one per backbone
+    const LINE_STYLE = {
+      [OURS]: { color: '#2563eb', width: 4, z: 10 }, 'TriAttention': { color: '#f59e0b', width: 2, z: 5 },
+      'InfiniPot-V': { color: '#10b981', width: 2, z: 4 }, 'SWA': { color: '#94a3b8', width: 1.5, z: 1 }
+    };
+    function renderLines() {
+      const box = document.getElementById('line-charts');
+      MODELS.forEach(m => {
+        const wrap = document.createElement('div');
+        wrap.className = 'rounded-2xl shadow border border-slate-100 p-4';
+        wrap.innerHTML = `<div class="text-center mb-2"><h3 class="text-lg font-bold text-slate-800 font-google-sans">${m}</h3><p class="text-sm text-slate-500">Overall accuracy vs. budget</p></div><div style="height:300px"><canvas></canvas></div>`;
+        box.appendChild(wrap);
+        const rows = D.main[m], full = rows.find(r => r.method === 'Full KV').vals[3][0];
+        const labels = ['1K', '3K', '6K'];
+        const ds = rows.filter(r => r.method !== 'Full KV').map(r => {
+          const st = LINE_STYLE[r.method] || { color: '#cbd5e1', width: 1.2, z: 2 };
+          return { label: r.method, data: [...r.vals[3]].reverse(), borderColor: st.color, backgroundColor: st.color, borderWidth: st.width,
+                   pointRadius: r.method === OURS ? 5 : 2.5, tension: 0.15, order: 20 - st.z };
+        });
+        ds.push({ label: 'Full KV', data: [full, full, full], borderColor: '#0f172a', borderDash: [6, 5], borderWidth: 1.5, pointRadius: 0, order: 30 });
+        new Chart(wrap.querySelector('canvas'), {
+          type: 'line', data: { labels, datasets: ds },
+          options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'nearest', intersect: false },
+            plugins: { legend: { display: m === MODELS[1], position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } },
+            scales: { y: { title: { display: true, text: 'Accuracy (%)' }, grid: { color: '#e2e8f0' } }, x: { title: { display: true, text: 'Visual tokens per head' }, grid: { display: false } } } }
+        });
+      });
+    }
+
+    // ---------- FPS bar chart (selected backbone)
+    let fpsChart;
+    function renderFps() {
+      document.getElementById('fps-backbone').textContent = current;
+      const names = Object.keys(D.fps).sort((a, b) => D.fps[b][current].fps - D.fps[a][current].fps);
+      const data = names.map(n => D.fps[n][current].fps);
+      const colors = names.map(n => n === OURS ? '#3b82f6' : (n === 'SWA' ? '#64748b' : '#94a3b8'));
+      if (fpsChart) fpsChart.destroy();
+      fpsChart = new Chart(document.getElementById('fps-chart'), {
+        type: 'bar', data: { labels: names, datasets: [{ data, backgroundColor: colors, borderRadius: 4 }] },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `${c.parsed.x.toFixed(1)} FPS (${(D.fps[c.label][current].ms6k * 1000).toFixed(0)} ms / round)` } } },
+          scales: { x: { title: { display: true, text: 'Frames per second' }, grid: { color: '#e2e8f0' } }, y: { grid: { display: false } } } }
+      });
+    }
+
+    // ---------- backbone tabs (table + FPS chart)
+    function renderTabs() {
+      const box = document.getElementById('backbone-tabs');
+      box.innerHTML = MODELS.map(m => `<button role="tab" class="tab-btn px-4 py-2 rounded-full bg-gray-100 text-gray-900 hover:bg-gray-200 transition-colors" aria-selected="${m === current}" data-m="${m}">${m}</button>`).join('');
+      box.querySelectorAll('button').forEach(b => b.onclick = () => { current = b.dataset.m; renderTabs(); renderMain(); renderFps(); });
+    }
+
+    // ---------- BibTeX copy
+    function copyBib(btn, label) {
+      navigator.clipboard.writeText(document.getElementById('bibtex').innerText).then(() => {
+        const t = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = label || t, 2000);
+      });
+    }
+    document.getElementById('copy-bib').onclick = (e) => copyBib(e.target, 'Copy');
+    document.getElementById('copy-bib-top').onclick = (e) => copyBib(e.target, 'BibTeX');
+    document.querySelectorAll('a.soon').forEach(a => a.addEventListener('click', e => e.preventDefault()));
+
+    renderLines(); renderTabs(); renderMain(); renderStream(); renderFps();
+  </script>
+</body>
+
+</html>
