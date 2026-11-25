@@ -58,16 +58,19 @@
 
   <main class="container mx-auto px-4 pb-20 space-y-16">
 
-    <!-- ================= Teaser + TL;DR ================= -->
+    <!-- ================= Demo video + TL;DR ================= -->
     <div class="space-y-4">
-      <div class="max-w-5xl mx-auto">
-        <img src="./figures/teaser.png" alt="Overview of ReSQue" class="w-full h-auto" />
-      </div>
-      <p class="mx-auto max-w-5xl text-center text-slate-600 text-sm md:text-base leading-snug px-4 md:px-12">
-        <strong class="font-semibold text-slate-700">(a)</strong> ReSQue fits a few queries per attention head so that their attention matches the question-averaged attention on calibration videos.
-        <strong class="font-semibold text-slate-700">(b)</strong> During the stream, the fitted query is reused at every compression round and scores the cache without a forward pass.
-        <strong class="font-semibold text-slate-700">(c)</strong> MLVU accuracy at 6K against throughput (frames per second), averaged over three backbones.
-      </p>
+      <!-- Demo video: same video, same question -->
+      <section class="max-w-5xl mx-auto">
+        <div class="rounded-2xl overflow-hidden shadow-2xl border border-slate-200 bg-slate-100 aspect-video">
+          <video controls autoplay loop muted playsinline preload="auto" poster="./figures/demo_poster.jpg" class="w-full h-full object-cover" src="./demo.mp4"></video>
+        </div>
+        <p class="mt-4 text-center text-slate-600 text-sm md:text-base leading-snug px-4 md:px-12">
+          <strong class="font-semibold text-slate-700">Same video, same question</strong> (Qwen2.5-VL-7B, LongVideoBench, a 19-minute video).
+          Full KV prefills the whole video, 52K tokens, after the question is asked. InfiniPot-V and ReSQue process the stream with a fixed cache of about 6.5K tokens.
+          ReSQue answers correctly like Full KV, while InfiniPot-V answers incorrectly.
+        </p>
+      </section>
       <section class="py-2 mx-auto max-w-5xl text-center">
         <p class="text-slate-800 leading-relaxed text-lg font-light">
           <span class="font-bold">TL;DR:</span> We present <span class="font-medium italic">ReSQue (Representative Surrogate Query)</span>, which learns a few reusable query vectors per attention head
@@ -98,6 +101,16 @@
         In streaming video, the KV cache must be compressed <em>before</em> any question arrives. If the future questions were known, we would keep the visual tokens that they attend to most.
         ReSQue approximates this ideal with a small set of <strong class="font-medium">learned, fixed query vectors per attention head</strong>: they are fitted once per model and then reused for every video and every compression round.
       </p>
+
+      <figure class="mb-10"><div class="max-w-5xl mx-auto">
+        <img src="./figures/teaser.png" alt="Overview of ReSQue" class="w-full h-auto" />
+      </div>
+      <p class="mx-auto mt-2 max-w-5xl text-center text-slate-600 text-sm md:text-base leading-snug px-4 md:px-12">
+        <strong class="font-semibold text-slate-700">(a)</strong> ReSQue fits a few queries per attention head so that their attention matches the question-averaged attention on calibration videos.
+        <strong class="font-semibold text-slate-700">(b)</strong> During the stream, the fitted query is reused at every compression round and scores the cache without a forward pass.
+        <strong class="font-semibold text-slate-700">(c)</strong> MLVU accuracy at 6K against throughput (frames per second), averaged over three backbones.
+      </p>
+      </figure>
 
       <div class="grid md:grid-cols-3 gap-8 mt-8">
         <div>
